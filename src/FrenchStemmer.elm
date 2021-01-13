@@ -1,20 +1,28 @@
-module FrenchStemmer exposing
-    ( debugStemmer
-    , frenchStopWords
-    , stemmer
-    , step1
-    , step2a
-    , step2b
-    , step3
-    , step4
-    , step5
-    )
+module FrenchStemmer exposing (stemmer, debugStemmer, frenchStopWords)
 
-import List.Extra exposing (dropWhile, takeWhile)
+{-| This is an implementation of the french version of the Porter stemmer algorithm taken from
+<http://snowball.tartarus.org/algorithms/french/stemmer.html>
+
+The stemmer function is a drop in replacement for <https://package.elm-lang.org/packages/rluiten/stemmer>
+
+when building the `ElmSearchText` index is should be used like this:
+
+    ElmTextSearch.newWith
+        { indexType = "ElmTextSearch - Customized French index"
+        , ref = ..
+        , fields = ..
+        , listFields = [..]
+        , initialTransformFactories = Index.Defaults.defaultInitialTransformFactories
+        , transformFactories = [ (\func index -> ( index, func )) (FrenchStemmer.stemmer True) ]
+        , filterFactories = [ createFilterFunc FrenchStemmer.frenchStopWords ]
+        }
 
 
+## Usage
 
--- source http://snowball.tartarus.org/algorithms/french/stemmer.html
+@docs stemmer, debugStemmer, frenchStopWords
+
+-}
 
 
 accentedForms =
@@ -818,12 +826,25 @@ step6 rec =
 -------------
 
 
+{-| Runs the stemmer algorithm and returns the stem of the word.
+The Bool parameter allows for the removal of articles or grammatical
+particles prefixed to the word and linked to it by an apostrophe.
+
+    stemmer True "documentation" == "document"
+
+    stemmer True "l'ail" == "ail"
+
+    stemmer False "l'ail" == "ail"
+
+-}
 stemmer : Bool -> String -> String
 stemmer remAp word =
     let
         vowelMarkedStr =
             if remAp then
                 removeApostrophePrefixes word
+                    |> String.toLower
+                    |> vowelMarked
 
             else
                 word
@@ -841,6 +862,13 @@ stemmer remAp word =
         |> .input
 
 
+{-| Runs the stemmer algorithm and gives a detailed output containing
+information about the word subdivisions used by the algorithm
+and the steps realised.
+
+    debugStemmer "documentation" == "{ currentR1 = " ument ", currentR2 = " ent ", currentRV = " cument ", input = " document ", lastEffective = Just Step1, realised = [Step6,Step5,Step3,Step1] }"
+
+-}
 debugStemmer : String -> Record
 debugStemmer word =
     let
@@ -946,13 +974,13 @@ rN remaining =
 
 takeWhileString p s =
     String.toList s
-        |> List.Extra.takeWhile p
+        |> takeWhile p
         |> String.fromList
 
 
 dropWhileString p s =
     String.toList s
-        |> List.Extra.dropWhile p
+        |> dropWhile p
         |> String.fromList
 
 
@@ -1006,205 +1034,50 @@ startingRecord w =
     }
 
 
+dropWhile : (a -> Bool) -> List a -> List a
+dropWhile predicate list =
+    case list of
+        [] ->
+            []
 
--------------------------------------------------------------------------------
--- tests --
-
-
-words =
-    [ "continu"
-    , "continua"
-    , "continuait"
-    , "continuant"
-    , "continuation"
-    , "continue"
-    , "continué"
-    , "continuel"
-    , "continuelle"
-    , "continuellement"
-    , "continuelles"
-    , "continuels"
-    , "continuer"
-    , "continuera"
-    , "continuerait"
-    , "continueront"
-    , "continuez"
-    , "continuité"
-    , "continuons"
-    , "contorsions"
-    , "contour"
-    , "contournait"
-    , "contournant"
-    , "contourne"
-    , "contours"
-    , "contractait"
-    , "contracté"
-    , "contractée"
-    , "contracter"
-    , "contractés"
-    , "contractions"
-    , "contradictoirement"
-    , "contradictoires"
-    , "contraindre"
-    , "contraint"
-    , "contrainte"
-    , "contraintes"
-    , "contraire"
-    , "contraires"
-    , "contraria"
-    , "main"
-    , "mains"
-    , "maintenaient"
-    , "maintenait"
-    , "maintenant"
-    , "maintenir"
-    , "maintenue"
-    , "maintien"
-    , "maintint"
-    , "maire"
-    , "maires"
-    , "mairie"
-    , "mais"
-    , "maïs"
-    , "maison"
-    , "maisons"
-    , "maistre"
-    , "maitre"
-    , "maître"
-    , "maîtres"
-    , "maîtresse"
-    , "maîtresses"
-    , "majesté"
-    , "majestueuse"
-    , "majestueusement"
-    , "majestueux"
-    , "majeur"
-    , "majeure"
-    , "major"
-    , "majordome"
-    , "majordomes"
-    , "majorité"
-    , "majorités"
-    , "mal"
-    , "malacca"
-    , "malade"
-    , "malades"
-    , "maladie"
-    , "maladies"
-    , "maladive"
-    ]
-
-
-stems =
-    [ "continu"
-    , "continu"
-    , "continu"
-    , "continu"
-    , "continu"
-    , "continu"
-    , "continu"
-    , "continuel"
-    , "continuel"
-    , "continuel"
-    , "continuel"
-    , "continuel"
-    , "continu"
-    , "continu"
-    , "continu"
-    , "continu"
-    , "continu"
-    , "continu"
-    , "continuon"
-    , "contors"
-    , "contour"
-    , "contourn"
-    , "contourn"
-    , "contourn"
-    , "contour"
-    , "contract"
-    , "contract"
-    , "contract"
-    , "contract"
-    , "contract"
-    , "contract"
-    , "contradictoir"
-    , "contradictoir"
-    , "contraindr"
-    , "contraint"
-    , "contraint"
-    , "contraint"
-    , "contrair"
-    , "contrair"
-    , "contrari"
-    , "main"
-    , "main"
-    , "mainten"
-    , "mainten"
-    , "mainten"
-    , "mainten"
-    , "maintenu"
-    , "maintien"
-    , "maintint"
-    , "mair"
-    , "mair"
-    , "mair"
-    , "mais"
-    , "maï"
-    , "maison"
-    , "maison"
-    , "maistr"
-    , "maitr"
-    , "maîtr"
-    , "maîtr"
-    , "maîtress"
-    , "maîtress"
-    , "majest"
-    , "majestu"
-    , "majestu"
-    , "majestu"
-    , "majeur"
-    , "majeur"
-    , "major"
-    , "majordom"
-    , "majordom"
-    , "major"
-    , "major"
-    , "mal"
-    , "malacc"
-    , "malad"
-    , "malad"
-    , "malad"
-    , "malad"
-    , "malad"
-    ]
-
-
-tester =
-    List.map2
-        (\w s ->
-            let
-                result =
-                    debugStemmer w
-            in
-            if result.input /= s then
-                Just result
+        x :: xs ->
+            if predicate x then
+                dropWhile predicate xs
 
             else
-                Nothing
-        )
-        words
-        stems
-        |> List.filterMap identity
+                list
+
+
+takeWhile : (a -> Bool) -> List a -> List a
+takeWhile predicate =
+    let
+        takeWhileMemo memo list =
+            case list of
+                [] ->
+                    List.reverse memo
+
+                x :: xs ->
+                    if predicate x then
+                        takeWhileMemo (x :: memo) xs
+
+                    else
+                        List.reverse memo
+    in
+    takeWhileMemo []
 
 
 
--------------------------------------------------------------------------------
 ---------------------
 -- frenchStopWords --
 ---------------------
---https://github.com/stopwords-iso/stopwords-fr
 
 
+{-| A list of french stop words to be ignored while indexing a document.
+
+Source: <https://github.com/stopwords-iso/stopwords-fr>
+
+-}
+frenchStopWords : List String
 frenchStopWords =
     [ "a"
     , "abord"
